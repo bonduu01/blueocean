@@ -1,0 +1,31 @@
+pipeline {
+    agent any
+    stages {
+    stage('SCM Checkout') {
+        git credentialsId: 'user_git', url: 'http://10.128.0.4/bonduu01/docker-demo.git', branch: 'master'
+        
+    }
+
+    stage('Build && Package Using Docker') {
+        //publishHTML([allowMissing: false, alwaysLinkToLastBuild: false, keepAll: false, reportDir: '', reportFiles: 'index.html', reportName: 'Scan Images For Vulneralities using AquaMicroScanner', reportTitles: ''])
+        sh 'docker build --rm -t 10.128.0.2:8082/myapp:"$BUILD_NUMBER" .'
+        sh 'docker tag 10.128.0.2:8082/myapp:"$BUILD_NUMBER" myapp:latest'
+    }
+    
+    stage('AquaMicroScanner') {
+        aquaMicroscanner imageName: 'myapp:latest', notCompliesCmd: 'exit 1', onDisallowed: 'ignore', outputFormat:'html'
+    }
+
+    stage('Push Image to repository && clean dangling images') {
+        sh 'docker push 10.128.0.2:8082/myapp:"$BUILD_NUMBER"'
+    }
+    
+    stage('Deploy into multiple servers') {
+        //sh 'docker login -u admin http://10.128.0.2:8082/ -p Batsignal30$'
+        sh 'ansible-playbook /app/ansible-playbook/deploy.yml --extra-vars buildNum="$BUILD_NUMBER"'
+    //     sh 'docker rm -f payoutlet-central-web'
+    //     sh 'docker run -d --name payoutlet-central-web --restart unless-stopped -p 51511:80 172.17.10.83:5101/payoutlet-central:"$BUILD_NUMBER"'
+    // 
+    }
+    }
+}   
